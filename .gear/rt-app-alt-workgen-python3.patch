@@ -1,0 +1,69 @@
+--- a/doc/workgen
++++ b/doc/workgen
+@@ -8,12 +8,12 @@ import signal
+ 
+ def check_unikid_json(infile, outfile, verbose=0):
+     if not os.path.exists(infile):
+-        print "WARN: %s does not exist", infile
++        print("WARN: %s does not exist" % infile)
+ 
+     try:
+         fi = open(infile, "r")
+     except IOError:
+-        print "WARN: Unable to open %s", infile
++        print("WARN: Unable to open %s" % infile)
+         sys.exit(2)
+ 
+     lines = fi.readlines()
+@@ -22,7 +22,7 @@ def check_unikid_json(infile, outfile, verbose=0):
+     try:
+         fo = open(outfile, "w+")
+     except IOError:
+-        print "WARN: Unable to open %s", f
++        print("WARN: Unable to open %s" % outfile)
+         sys.exit(2)
+ 
+     curid = 1
+@@ -59,7 +59,7 @@ def check_unikid_json(infile, outfile, verbose=0):
+                 newkey_id = key_id + str(curid)
+ 
+             if verbose:
+-                print "level ", refcount, " : key ", key_id, " changed into ", newkey_id
++                print("level %d : key %s changed into %s" % (refcount, key_id, newkey_id))
+ 
+             myline = myline.replace(key_id, newkey_id, 1)
+             key_id = newkey_id
+@@ -76,6 +76,6 @@ if __name__ == '__main__':
+ 
+     def handleSigTERM(signum, frame):
+-        sys.exit
++        sys.exit(0)
+ 
+     signal.signal(signal.SIGTERM, handleSigTERM)
+     signal.signal(signal.SIGINT, handleSigTERM)
+@@ -89,14 +89,14 @@ if __name__ == '__main__':
+     try:
+         opts, args = getopt.getopt(sys.argv[1:], "o:avd")
+     except getopt.GetoptError as err:
+-        print str(err) # will print something like "option -a not recognized"
++        print(str(err)) # will print something like "option -a not recognized"
+         sys.exit(2)
+ 
+     for o, a in opts:
+         if o == "-o":
+             outfile = a
+         if o == "-a":
+-            selfupate = 1
++            selfupdate = 1
+         if o == "-v":
+             verbose = 1
+         if o == "-d":
+@@ -106,7 +106,7 @@ if __name__ == '__main__':
+         if selfupdate:
+             outfile = f
+ 
+-        check_unikid_json(outfile, outfile)
++        check_unikid_json(f, outfile, verbose)
+ 
+         if not dry_run:
+             subprocess.call(["rt-app", outfile])

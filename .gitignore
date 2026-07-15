@@ -6,6 +6,7 @@ aclocal.m4
 *.txt
 *.swp
 *.patch
+!.gear/*.patch
 cscope.out
 ID
 GPATH
@@ -34,4 +35,3 @@ src/*.o
 src/*.txt
 src/*.swp
 src/stamp-h1
-
