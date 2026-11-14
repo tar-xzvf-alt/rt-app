@@ -2,3 +2,4 @@ tar: .
 spec: .gear/rt-app.spec
 copy: .gear/rt-app-alt-configure-ac-version.patch
 copy: .gear/rt-app-alt-workgen-python3.patch
+copy: .gear/rt-app-alt-compiler-warnings.patch

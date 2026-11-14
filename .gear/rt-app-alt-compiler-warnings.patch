@@ -1,0 +1,115 @@
+Subject: [PATCH] Clean up compiler warnings without changing the workload
+
+Keep the math calls, explicitly discarding their unused results.  The
+scheduler helper does not return a value and its callers do not expect one.
+Preserve the optional foreach index while marking it unused where needed.
+
+--- a/src/rt-app.c
++++ b/src/rt-app.c
+@@ -217,17 +217,17 @@
+  */
+ void waste_cpu_cycles(unsigned long long load_loops)
+ {
+-	double param, result;
++	double param;
+ 	double n;
+ 	unsigned long long i;
+ 
+ 	param = 0.95;
+ 	n = 4;
+ 	for (i = 0 ; i < load_loops ; i++) {
+-		result = ldexp(param , (ldexp(param , ldexp(param , n))));
+-		result = ldexp(param , (ldexp(param , ldexp(param , n))));
+-		result = ldexp(param , (ldexp(param , ldexp(param , n))));
+-		result = ldexp(param , (ldexp(param , ldexp(param , n))));
++		(void)ldexp(param , (ldexp(param , ldexp(param , n))));
++		(void)ldexp(param , (ldexp(param , ldexp(param , n))));
++		(void)ldexp(param , (ldexp(param , ldexp(param , n))));
++		(void)ldexp(param , (ldexp(param , ldexp(param , n))));
+ 	}
+ 	return;
+ }
+@@ -988,12 +988,18 @@
+ 		case rr:
+ 		case fifo:
+ 			return sched_data->prio;
++		case other:
++		case batch:
++		case idle:
++		case deadline:
++		case same:
++			return 0;
+ 	}
+ 
+ 	 return 0;
+ }
+ 
+-static bool __set_thread_policy_priority(thread_data_t *data,
++static void __set_thread_policy_priority(thread_data_t *data,
+ 					 sched_data_t *sched_data)
+ {
+ 	struct sched_param param;
+@@ -1247,13 +1253,10 @@
+ 	log_data_t ldata;
+ 	struct sched_param param;
+ 	struct timespec t_start, t_end, t_first;
+-	unsigned long t_start_usec;
+-	long slack;
+ 	timing_point_t *curr_timing;
+ 	timing_point_t *timings;
+ 	timing_point_t tmp_timing;
+ 	unsigned int timings_size, timing_loop;
+-	struct sched_attr attr;
+ 	int ret, phase, phase_loop, thread_loop, log_idx;
+ 
+ 	/* Set thread name */
+@@ -1616,8 +1619,7 @@
+ 
+ int main(int argc, char* argv[])
+ {
+-	int i, res, nresources;
+-	rtapp_resource_t *rdata;
++	int i;
+ 	static cpu_set_t orig_set;
+ 	struct stat sb;
+ 	char tmp[PATH_LENGTH];
+--- a/src/rt-app_parse_config.c
++++ b/src/rt-app_parse_config.c
+@@ -1306,6 +1306,8 @@
+ 			i++;
+ 		}
+ 	}
++	/* The foreach index is not needed when filtering events by name. */
++	(void)idx;
+ 	parse_cpuset_data(obj, &data->cpu_data);
+ 	parse_numa_data(obj, &data->numa_data);
+ 	data->sched_data = parse_sched_data(obj, same);
+@@ -1316,7 +1318,7 @@
+ parse_task_data(char *name, struct json_object *obj, int index,
+ 		  thread_data_t *data, rtapp_options_t *opts)
+ {
+-	struct json_object *phases_obj, *resources;
++	struct json_object *phases_obj;
+ 
+ 	log_info(PFX "Parsing task %s [%d]", name, index);
+ 
+@@ -1476,6 +1478,8 @@
+ 	opts->threads_data = malloc(sizeof(thread_data_t) * opts->num_tasks);
+ 	foreach (tasks, entry, key, val, idx)
+ 		parse_task_data(key, val, -1, &opts->threads_data[i++], opts);
++	/* The task array has its own index; the foreach index is unused. */
++	(void)idx;
+ }
+ 
+ static void
+--- a/src/rt-app_taskgroups.c
++++ b/src/rt-app_taskgroups.c
+@@ -157,7 +157,7 @@
+ 		return ret;
+ 	}
+ 
+-	while (ent = getmntent(mounts)) {
++	while ((ent = getmntent(mounts)) != NULL) {
+ 		if (strcmp(ent->mnt_type, "cgroup"))
+ 			continue;
+ 
