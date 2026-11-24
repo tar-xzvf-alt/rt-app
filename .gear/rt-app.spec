@@ -2,7 +2,7 @@
 %define _unpackaged_files_terminate_build 1
 Name: rt-app
 Version: 1.0
-Release: alt3.gitd6f8be4
+Release: alt4.gitd6f8be4
 Summary: Synthetic real-time periodic workload generator
 License: GPLv2
 Group: System/Kernel and hardware 
@@ -18,7 +18,7 @@ BuildRequires: libnuma-devel
 Source0: %name-%version.tar
 # Use a fixed snapshot version when regenerating configure without Git.
 Patch0: rt-app-alt-configure-ac-version.patch
-# Port workgen to Python 3 and fix its input handling and control flow.
+# Port workgen to Python 3, parse JSON properly and update files atomically.
 Patch1: rt-app-alt-workgen-python3.patch
 # Fix compiler warnings while preserving the calibrated workload.
 Patch2: rt-app-alt-compiler-warnings.patch
@@ -58,6 +58,9 @@ install -pDm644 doc/tutorial.txt %buildroot%_datadir/%name/tutorial.txt
 %_datadir/%name/
 
 %changelog
+* Tue Nov 24 2026 Taran Evgeniy <tar@altlinux.org> 1.0-alt4.gitd6f8be4
+- Fix workgen JSON parsing and prevent input truncation on failure.
+
 * Fri Nov 13 2026 Taran Evgeniy <taranev@basealt.ru> 1.0-alt3.gitd6f8be4
 - Fix compiler warnings while preserving the calibrated workload.
 

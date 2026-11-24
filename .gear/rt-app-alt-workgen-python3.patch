@@ -1,39 +1,137 @@
 --- a/doc/workgen
 +++ b/doc/workgen
-@@ -8,12 +8,12 @@ import signal
+@@ -1,82 +1,75 @@
+ #!/usr/bin/env python
  
- def check_unikid_json(infile, outfile, verbose=0):
-     if not os.path.exists(infile):
+-import os
+-import sys
+ import getopt
+-import subprocess
++import json
++import os
+ import signal
++import stat
++import subprocess
++import sys
++import tempfile
+ 
+-def check_unikid_json(infile, outfile, verbose=0):
+-    if not os.path.exists(infile):
 -        print "WARN: %s does not exist", infile
-+        print("WARN: %s does not exist" % infile)
- 
-     try:
-         fi = open(infile, "r")
-     except IOError:
+-
+-    try:
+-        fi = open(infile, "r")
+-    except IOError:
 -        print "WARN: Unable to open %s", infile
-+        print("WARN: Unable to open %s" % infile)
-         sys.exit(2)
- 
-     lines = fi.readlines()
-@@ -22,7 +22,7 @@ def check_unikid_json(infile, outfile, verbose=0):
-     try:
-         fo = open(outfile, "w+")
-     except IOError:
+-        sys.exit(2)
+-
+-    lines = fi.readlines()
+-    fi.close()
+-
+-    try:
+-        fo = open(outfile, "w+")
+-    except IOError:
 -        print "WARN: Unable to open %s", f
-+        print("WARN: Unable to open %s" % outfile)
-         sys.exit(2)
+-        sys.exit(2)
+-
+-    curid = 1
+-    refcount = 0
+-    idlist = {}
+-    myid = []
+-    for myline in lines:
+-
+-        if "{" in myline:
+-            refcount +=1
+-            myid.append(curid)
+-            curid = 1
+-            idlist[refcount] = {}
+-
+-        if "}" in myline:
+-            del idlist[refcount]
+-            curid = myid.pop()
+-            refcount -=1
+-
+-        try:
+-            key_id, value = myline.split(":", 1)
+-        except ValueError:
+-            fo.write(myline)       
+-            continue
+-
+-        key_id = key_id.strip('\"\t\n\r ')
+-
+-        value = value.strip(',\"\t\n\r ')
+-
+-        if key_id in idlist[refcount]:
+-            newkey_id = key_id + str(curid)
+-            while newkey_id in idlist[refcount]:
+-                curid +=1
+-                newkey_id = key_id + str(curid)
  
-     curid = 1
-@@ -59,7 +59,7 @@ def check_unikid_json(infile, outfile, verbose=0):
-                 newkey_id = key_id + str(curid)
- 
++def unique_keys(pairs, verbose):
++    # Reserve existing names so a generated suffix cannot rename a real key.
++    reserved = {key for key, _ in pairs}
++    result = {}
++    next_suffix = {}
++    for key, value in pairs:
++        if key in result:
++            suffix = next_suffix.get(key, 1)
++            while f"{key}{suffix}" in reserved:
++                suffix += 1
++            new_key = f"{key}{suffix}"
++            next_suffix[key] = suffix + 1
++            reserved.add(new_key)
              if verbose:
 -                print "level ", refcount, " : key ", key_id, " changed into ", newkey_id
-+                print("level %d : key %s changed into %s" % (refcount, key_id, newkey_id))
++                print(f"key {key} changed into {new_key}")
++            key = new_key
++        result[key] = value
++    return result
  
-             myline = myline.replace(key_id, newkey_id, 1)
-             key_id = newkey_id
-@@ -76,6 +76,6 @@ if __name__ == '__main__':
+-            myline = myline.replace(key_id, newkey_id, 1)
+-            key_id = newkey_id
+ 
+-        idlist[refcount][key_id] = value
+-
+-        fo.write(myline)
++def check_unikid_json(infile, outfile, verbose=0):
++    with open(infile, encoding="utf-8") as source:
++        data = json.load(
++            source, object_pairs_hook=lambda pairs: unique_keys(pairs, verbose)
++        )
+ 
+-    fo.close()
++    # Resolve links as opening the destination directly used to do.
++    outfile = os.path.realpath(outfile)
++    try:
++        info = os.stat(outfile)
++    except FileNotFoundError:
++        mode = None
++    else:
++        if not stat.S_ISREG(info.st_mode):
++            raise ValueError(f"not a regular file: {outfile}")
++        mode = stat.S_IMODE(info.st_mode)
+ 
+-    return
++    # Do not truncate the destination: publish only a complete result.
++    tempname = None
++    try:
++        with tempfile.NamedTemporaryFile(
++            mode="w", encoding="utf-8", dir=os.path.dirname(outfile),
++            prefix=".workgen-", delete=False,
++        ) as output:
++            tempname = output.name
++            json.dump(data, output, indent=2, allow_nan=False)
++            output.write("\n")
++        if mode is not None:
++            os.chmod(tempname, mode)
++        os.replace(tempname, outfile)
++        tempname = None
++    finally:
++        if tempname is not None:
++            os.unlink(tempname)
+ 
+ 
+ if __name__ == '__main__':
  
      def handleSigTERM(signum, frame):
 -        sys.exit
@@ -41,7 +139,7 @@
  
      signal.signal(signal.SIGTERM, handleSigTERM)
      signal.signal(signal.SIGINT, handleSigTERM)
-@@ -89,14 +89,14 @@ if __name__ == '__main__':
+@@ -89,14 +82,14 @@
      try:
          opts, args = getopt.getopt(sys.argv[1:], "o:avd")
      except getopt.GetoptError as err:
@@ -58,12 +156,16 @@
          if o == "-v":
              verbose = 1
          if o == "-d":
-@@ -106,7 +106,7 @@ if __name__ == '__main__':
+@@ -106,7 +99,11 @@
          if selfupdate:
              outfile = f
  
 -        check_unikid_json(outfile, outfile)
-+        check_unikid_json(f, outfile, verbose)
++        try:
++            check_unikid_json(f, outfile, verbose)
++        except (OSError, ValueError, RecursionError) as error:
++            print(f"workgen: {error}", file=sys.stderr)
++            sys.exit(2)
  
          if not dry_run:
              subprocess.call(["rt-app", outfile])
